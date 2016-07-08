@@ -16,20 +16,20 @@ contract owned {
     
 }
 
-contract Commit is Owned {
+contract Commit is owned {
 
     uint public rewardBalance;
-    float32 public ownershipRake;
+    uint public ownershipRakeDivisor;
     address public charityAddress;
     uint public totalDonated;    // Keep track of total donation over time
 
     mapping (address => Commitment) public commitments;
     address[] userAddresses;   // Need to keep a list of all user addresses since you can't iterate over a mapping
 
-    event CommitmentAdded(commitmentLabel, address user, uint value, uint occurrences, uint deadline);
-    event CommitmentSucceeded(commitmentLabel, address user, uint value, uint occurrences);
-    event CommitmentFailed(commitmentLabel, address user, uint value);
-    event CommitReported(commitmentLabel, address user);
+    event CommitmentAdded(string commitmentLabel, address user, uint value, uint occurrences, uint deadline);
+    event CommitmentSucceeded(string commitmentLabel, address user, uint value, uint occurrences);
+    event CommitmentFailed(string commitmentLabel, address user, uint value);
+    event CommitReported(string commitmentLabel, address user);
     event DonatedToCharity(address charity, uint value);
 
     struct Commitment {
@@ -48,9 +48,9 @@ contract Commit is Owned {
     function Commit() {
 	// constructor
 	rewardBalance = 0;
-	ownershipRake = 0.2;
+	ownershipRakeDivisor = 5;   // Equal to 20% rake
 	totalDonated = 0;
-	charityAddress = "";       // TBD, fill in address of donation charity
+	charityAddress = 0x00;       // TBD, fill in address of donation charity
     }
 
     function donate() onlyOwner {
@@ -69,7 +69,7 @@ contract Commit is Owned {
 	// inactive, and transfer the balance between the owner and the
 	// reward pot
 	for (uint i = 0; i < userAddresses.length; i++) {
-	    c = commitments[userAddresses[i]];
+	    Commitment c = commitments[userAddresses[i]];
 	    if (c.active == true && isPastDeadline(c) == true) {
 		failCommitment(c);
 	    }
@@ -92,13 +92,13 @@ contract Commit is Owned {
 
 	// Check to see if there's already a commitment for this user that is active
 	Commitment currentForUser = commitments[msg.sender];
-	if (currentForUser != 0 &&  currentForUser.active == true) throw;
+	if (currentForUser.active == true) throw;
 
 	// Add this user to our user list if they don't exist
 	addUserToListIfMissing(msg.sender);
 
 	// Generate a new commitment
-	Commitment c;
+	Commitment c = commitments[msg.sender];
 	c.user = msg.sender;
 	c.deposit = msg.value;
 	c.balance = c.deposit;   // Balance starts equal to initial deposit
@@ -110,15 +110,13 @@ contract Commit is Owned {
 	c.succeeded = false;
 	c.failed = false;
 
-	commitments[msg.sender] = c;
-
 	CommitmentAdded(c.label, c.user, c.deposit, c.targetOccurrences, c.deadline);
 	return true;
     }
 
     function submitOccurrence() returns (bool success) {
 	Commitment c = commitments[msg.sender];
-	if (c == 0 || c.active == false) throw;  // Couldn't find any commitment for this user
+	if (c.active == false) throw;  // Couldn't find any active commitment for this user
 
 	c.currentOccurrences++;
 	if (isPastDeadline(c)) {
@@ -127,7 +125,7 @@ contract Commit is Owned {
 	    return false;
 	}
 
-	CommitReported(c.label, msg.sender)
+	CommitReported(c.label, msg.sender);
 	if (isWinner(c) == true) {
 	    // Report victory!
 	    succeedCommitment(c);
@@ -143,7 +141,7 @@ contract Commit is Owned {
     }
 
 
-    // Can these be private?
+    // PRIVATE
 
     function isPastDeadline(Commitment c) private returns (bool failure) {
 	if (now > c.deadline) {
@@ -166,8 +164,8 @@ contract Commit is Owned {
 	// Do you need a mutex around these?
 	uint balance = c.balance;
 
-	ownersCut = balance * ownershipRake;
-	rewardCut = balance - ownersCut;
+	uint ownersCut = balance / ownershipRakeDivisor;
+	uint rewardCut = balance - ownersCut;
 
 	owner.send(ownersCut);
 	rewardBalance += rewardCut;
@@ -187,14 +185,14 @@ contract Commit is Owned {
 	c.user.send(c.balance);
 	c.balance = 0;
 
-	CommitmentSucceeded(c.label, c.user, c.deposit, c.targetOccurrences)
+	CommitmentSucceeded(c.label, c.user, c.deposit, c.targetOccurrences);
     }
 
     // Pay out one event's worth of accomplishment bounty
     function payoutPartial(Commitment c) private {
 	uint partialPayout = c.deposit / c.targetOccurrences;
 	c.user.send(partialPayout);
-	c.user.balance -= partialPayout;
+	c.balance -= partialPayout;
     }
 
     function addUserToListIfMissing(address addr) private {
@@ -207,8 +205,8 @@ contract Commit is Owned {
 	}
 
 	if (exists == false) {
-	    uint i = userAddresses.length++;
-	    users[i] = addr;
+	    uint j = userAddresses.length++;
+	    userAddresses[j] = addr;
 	}
     }
 }
