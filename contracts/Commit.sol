@@ -134,7 +134,16 @@ contract Commit is owned {
 	    payoutPartial(c);
 	}
 	return true;
-    }    
+    }
+
+    function getBalanceForUser(address userAddress) returns (uint balance) {
+	Commitment c = commitments[userAddress];
+	return c.balance;
+    }
+
+    function getBalance() returns (uint balance) {
+	return getBalanceForUser(msg.sender);
+    }
 
     function () {
 	throw;
