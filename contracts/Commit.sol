@@ -55,7 +55,7 @@ contract Commit is owned {
 
     function donate() onlyOwner {
 	// send rewardBalance to the charityAddress
-	charityAddress.send(rewardBalance);
+	var res = charityAddress.send(rewardBalance);
 
 	// Check if success on the send before zeroing the balance?
 	totalDonated += rewardBalance;
@@ -176,7 +176,7 @@ contract Commit is owned {
 	uint ownersCut = balance / ownershipRakeDivisor;
 	uint rewardCut = balance - ownersCut;
 
-	owner.send(ownersCut);
+	var res = owner.send(ownersCut);
 	rewardBalance += rewardCut;
 
 	c.balance = 0;
@@ -191,7 +191,7 @@ contract Commit is owned {
 	c.active = false;
 	c.succeeded = true;
 	c.failed = false;
-	c.user.send(c.balance);
+	var res = c.user.send(c.balance);
 	c.balance = 0;
 
 	CommitmentSucceeded(c.label, c.user, c.deposit, c.targetOccurrences);
@@ -200,7 +200,7 @@ contract Commit is owned {
     // Pay out one event's worth of accomplishment bounty
     function payoutPartial(Commitment c) private {
 	uint partialPayout = c.deposit / c.targetOccurrences;
-	c.user.send(partialPayout);
+	var res = c.user.send(partialPayout);
 	c.balance -= partialPayout;
     }
 
